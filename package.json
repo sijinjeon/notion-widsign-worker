@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "setup:db": "tsx scripts/setup-database.ts"
   },
   "engines": {
     "node": ">=22.0.0",
@@ -17,6 +18,7 @@
     "typescript": "^5.8.0"
   },
   "dependencies": {
+    "@notionhq/client": "^5.26.0",
     "@notionhq/workers": ">=0.0.0",
     "jszip": "^3.10.1"
   }

@@ -22,6 +22,8 @@ src/
   notion/
     properties.ts         # Notion 페이지 속성 파싱 헬퍼 (title/rich_text/date/...)
     format.ts             # 숫자→한글 금액 표기, 날짜 포맷 등
+scripts/
+  setup-database.ts       # NOTION_API_TOKEN으로 "전자계약 관리 DB"를 자동 생성 (npm run setup:db)
 ```
 
 ## 이 저장소를 fork해서 자기 것으로 쓰려면
@@ -62,7 +64,11 @@ src/
    ```
    자세한 내용은 `docs/SECRETS.md` 참고.
 4. **Notion 데이터베이스 준비**
-   `docs/DATABASE_SCHEMA.md`에 필요한 속성 목록이 있습니다. 직접 만들거나, Notion AI에게 이 문서를 보여주고 재현해달라고 하면 됩니다.
+   NOTION_API_TOKEN의 연결(Integration)을 상위 페이지에 먼저 공유한 뒤, 스크립트로 자동 생성합니다.
+   ```bash
+   npm run setup:db -- <상위 페이지 ID 또는 URL>
+   ```
+   Notion API는 `진행상태` 옵션의 이름·색상은 정확히 만들지만 그룹(시작 전/진행 중/완료) 배정은 못 해서, 실행 후 안내되는 대로 옵션 몇 개만 원하는 그룹으로 드래그해주면 됩니다. 스크립트를 안 쓰고 싶다면 `docs/DATABASE_SCHEMA.md`의 속성 표를 보고 직접 만들어도 됩니다.
 5. **위드싸인 템플릿 준비**
    계약서 원본(Word/한글)을 위드싸인 대시보드에 업로드하고 필드를 배치합니다. 발신자가 미리 채울 필드와 수신자가 서명 중 입력할 필드를 구분해서 배치하세요 (`docs/FIELD_PLACEMENT.md` 참고). 완료되면 `src/widsign/fieldMapping.ts`의 `FORM_ITEM_MAP`에 자신의 form_id·item_id로 항목을 추가합니다.
 6. **자동화 연결**
