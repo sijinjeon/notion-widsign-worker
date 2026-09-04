@@ -37,17 +37,30 @@ src/
    ```bash
    ntn workers deploy --name <원하는-이름>
    ```
-3. **환경변수 설정** (`.env.example` 참고)
-   ```
-   WIDSIGN_API_ID=
-   WIDSIGN_API_KEY=
-   NOTION_API_TOKEN=
-   ```
+3. **환경변수(시크릿) 설정**
    - 위드싸인 API 키: 위드싸인 관리자 페이지에서 발급 (Business/Enterprise 플랜 필요)
    - Notion API 토큰: [Notion 연결(Integration)](https://app.notion.com/developers/connections) 생성 후, 사용할 데이터베이스에 연결 공유
+
+   두 가지 방법 중 편한 쪽으로 설정합니다.
+
+   **방법 A — 키를 하나씩 직접 지정** (`.env` 파일을 로컬에 남기지 않음)
    ```bash
+   ntn workers env set WIDSIGN_API_ID=xxx WIDSIGN_API_KEY=xxx NOTION_API_TOKEN=xxx
+   ```
+
+   **방법 B — `.env` 파일로 한 번에 push** (`.env.example` 복사해서 채운 뒤)
+   ```bash
+   cp .env.example .env   # 값을 채운 뒤
    ntn workers env push
    ```
+
+   설정된 키 목록 확인(값은 노출되지 않음), 삭제, 다른 환경으로 값 내려받기는 각각:
+   ```bash
+   ntn workers env list
+   ntn workers env unset <KEY>
+   ntn workers env pull        # 원격 값을 로컬 .env로 (팀원과 협업할 때 유용)
+   ```
+   자세한 내용은 `docs/SECRETS.md` 참고.
 4. **Notion 데이터베이스 준비**
    `docs/DATABASE_SCHEMA.md`에 필요한 속성 목록이 있습니다. 직접 만들거나, Notion AI에게 이 문서를 보여주고 재현해달라고 하면 됩니다.
 5. **위드싸인 템플릿 준비**
