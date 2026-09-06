@@ -77,6 +77,13 @@ async function main() {
         "수신자 이름": { type: "rich_text", rich_text: {} },
         "발신자 이메일": { type: "email", email: {}, description: "sender_email" },
         "양식 ID (form_id)": { type: "rich_text", rich_text: {}, description: "위드싸인 템플릿/양식 식별자" },
+        "계약종류": {
+          type: "select",
+          select: {},
+          description:
+            "옵션명은 src/widsign/fieldMapping.ts의 CONTRACT_TYPE_FORM_ID_MAP 키와 정확히 일치해야 함. " +
+            "옵션을 고르면 양식 ID (form_id)가 자동으로 채워짐 — docs/TEMPLATE_ID_GUIDE.md 참고",
+        },
         "전송 방식": {
           type: "select",
           select: {

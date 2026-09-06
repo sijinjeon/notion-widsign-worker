@@ -69,16 +69,32 @@ scripts/
    npm run setup:db -- <상위 페이지 ID 또는 URL>
    ```
    Notion API는 `진행상태` 옵션의 이름·색상은 정확히 만들지만 그룹(시작 전/진행 중/완료) 배정은 못 해서, 실행 후 안내되는 대로 옵션 몇 개만 원하는 그룹으로 드래그해주면 됩니다. 스크립트를 안 쓰고 싶다면 `docs/DATABASE_SCHEMA.md`의 속성 표를 보고 직접 만들어도 됩니다.
-5. **위드싸인 템플릿 준비**
-   계약서 원본(Word/한글)을 위드싸인 대시보드에 업로드하고 필드를 배치합니다. 발신자가 미리 채울 필드와 수신자가 서명 중 입력할 필드를 구분해서 배치하세요 (`docs/FIELD_PLACEMENT.md` 참고). 완료되면 `src/widsign/fieldMapping.ts`의 `FORM_ITEM_MAP`에 자신의 form_id·item_id로 항목을 추가합니다.
+5. **위드싸인 템플릿 준비 및 등록**
+   계약서 원본(Word/한글)을 위드싸인 대시보드에 업로드하고 필드를 배치합니다. 발신자가 미리 채울 필드와 수신자가 서명 중 입력할 필드를 구분해서 배치하세요 (`docs/FIELD_PLACEMENT.md` 참고). 템플릿의 양식 ID(form_id)를 찾아 `CONTRACT_TYPE_FORM_ID_MAP`과 Notion "계약종류" 속성에 등록하는 방법은 **`docs/TEMPLATE_ID_GUIDE.md`**를 따라하세요 — 코드 수정이 필요한 부분은 AI에게 도와달라고 요청하는 방법도 안내돼 있습니다.
 6. **자동화 연결**
    ```bash
    ntn workers webhooks list
    ```
    로 웹훅 URL을 확인하고, Notion 데이터베이스의 자동화 설정에서 연결합니다 (`docs/AUTOMATION_SETUP.md` 참고).
 
+## "계약종류" 자동 매핑
+
+Notion DB에 "양식 ID (form_id)"를 직접 입력하는 대신, "계약종류" select 속성에서 종류만 고르면 `src/widsign/fieldMapping.ts`의 `CONTRACT_TYPE_FORM_ID_MAP`을 찾아 자동으로 해당 위드싸인 템플릿으로 발송합니다. 매핑 안 된 종류를 고르면 발송 대신 "API 메모"에 오류가 남습니다(잘못된 템플릿으로 나가는 사고 방지). 새 종류를 추가하는 방법은 `docs/TEMPLATE_ID_GUIDE.md` 참고.
+
+## 완료 계약 자동 확인 (선택 기능)
+
+`src/sync/scheduledCompletionSync.ts`는 Notion 자동화 없이 **Worker 스스로 주기적으로 깨어나** 완료된 계약을 찾아 반영하는 기능입니다. 배포하면 자동으로 활성화되며, Worker 내부용 "위드싸인 동기화 스케줄러"라는 작은 DB가 워크스페이스에 하나 생깁니다(실제 계약 데이터는 안 들어있음 — 지워도 되지만 안 지워도 됨).
+
+- 기본적으로 매시간 깨어나지만, 실제 조회·처리는 지정한 요일·시각(기본: 화~토 8시·15시, KST)에만 하고 나머지는 API 호출 없이 바로 끝납니다 — 실행 비용을 아끼기 위해서입니다.
+- `WIDSIGN_SYNC_DATA_SOURCE_ID`를 설정하지 않으면 이 기능은 아무 일도 하지 않습니다(완전히 꺼진 것과 동일) — 즉 원치 않으면 이 env var를 비워두면 됩니다.
+- `WIDSIGN_DRY_RUN`(기본 `true`)이 켜져 있으면 실제로는 아무 것도 수정하지 않고 로그만 남깁니다. 동작을 충분히 확인한 뒤에만 `false`로 바꾸세요.
+- 관련 env var 전체 목록과 설명은 `.env.example` 참고.
+
+이미 있는 웹훅(`widsignSyncCompletedDocument` + Notion DB 자동화)만으로도 완료 확인은 되지만, 그쪽은 Notion 자동화의 최소 주기(하루)만큼 반영이 늦을 수 있습니다. 더 빠른 반영이 필요 없다면 이 기능은 없어도 무방합니다(다만 위에서 설명한 대로 배포하면 기본적으로 켜져 있습니다).
+
 ## 참고 문서
 
+- `docs/TEMPLATE_ID_GUIDE.md` — 새 계약 종류(위드싸인 템플릿) 추가하는 법
 - `docs/NOTION_WORKERS_SDK.md` — Notion Workers SDK 사용법 (scaffold 시 기본 제공되는 문서)
 - `.examples/` — Notion Workers의 tool/webhook/sync/automation 예제 코드
 

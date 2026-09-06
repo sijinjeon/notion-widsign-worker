@@ -21,7 +21,7 @@
 | 수신자 이메일 / 수신자 연락처 / 수신자 이름 | email / phone_number / rich_text | 발송 전 필수 |
 | 발신자 이메일 | email | 발송 계정 기록용 |
 | 양식 ID (form_id) | rich_text | 위드싸인 템플릿 ID. 직접 입력하는 대신 "계약종류"를 고르면 자동 채워짐(발송 성공 시 기록) |
-| 계약종류 | select | 전시참여작가 — `src/widsign/fieldMapping.ts`의 `CONTRACT_TYPE_FORM_ID_MAP`과 옵션명이 정확히 일치해야 함. 재사용 가능한 템플릿만 등록(계약 1건짜리 과거 문서는 제외) |
+| 계약종류 | select | **예시일 뿐** — "전시참여작가"는 원 제작자의 계약 종류입니다. 자신의 계약 종류로 옵션명을 바꾸고, `src/widsign/fieldMapping.ts`의 `CONTRACT_TYPE_FORM_ID_MAP`에 옵션명과 정확히 같은 키로 등록하세요(재사용 가능한 템플릿만 등록, 계약 1건짜리 과거 문서는 제외). 템플릿 ID를 찾는 방법은 `docs/TEMPLATE_ID_GUIDE.md` 참고 |
 | 전송 방식 | select | SAMETIME, SEQUENTIAL |
 | 발송 ID (send_id) | number | 자동 기록 |
 | 수신자 ID | rich_text | receiver_meta_id, 자동 기록 |
