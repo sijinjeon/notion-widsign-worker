@@ -20,7 +20,8 @@
 | 입금은행 / 계좌번호 / 예금주 | rich_text | 수신자 입력 |
 | 수신자 이메일 / 수신자 연락처 / 수신자 이름 | email / phone_number / rich_text | 발송 전 필수 |
 | 발신자 이메일 | email | 발송 계정 기록용 |
-| 양식 ID (form_id) | rich_text | 위드싸인 템플릿 ID |
+| 양식 ID (form_id) | rich_text | 위드싸인 템플릿 ID. 직접 입력하는 대신 "계약종류"를 고르면 자동 채워짐(발송 성공 시 기록) |
+| 계약종류 | select | 전시참여작가, 입주청소, 패키지디자인 — `src/widsign/fieldMapping.ts`의 `CONTRACT_TYPE_FORM_ID_MAP`과 옵션명이 정확히 일치해야 함. 재사용 가능한 템플릿만 등록(계약 1건짜리 과거 문서는 제외) |
 | 전송 방식 | select | SAMETIME, SEQUENTIAL |
 | 발송 ID (send_id) | number | 자동 기록 |
 | 수신자 ID | rich_text | receiver_meta_id, 자동 기록 |

@@ -1,8 +1,15 @@
-import { Worker } from "@notionhq/workers"
 import { j } from "@notionhq/workers/schema-builder"
 import JSZip from "jszip"
+import worker from "./worker.js"
 import * as widsign from "./widsign/api.js"
-import { buildSendItems, extractReceiverValues, type DbFieldKey, type DocDetailResult } from "./widsign/fieldMapping.js"
+import {
+  buildSendItems,
+  extractReceiverValues,
+  CONTRACT_TYPE_FORM_ID_MAP,
+  type DbFieldKey,
+  type DocDetailResult,
+} from "./widsign/fieldMapping.js"
+import { attachSignedDocument, syncCompletedContract } from "./widsign/completion.js"
 import { numberToKoreanWon, formatDate, formatDateRange } from "./notion/format.js"
 import {
   getTitle,
@@ -16,48 +23,10 @@ import {
   hasFiles,
   richText,
 } from "./notion/properties.js"
-import type { Client } from "@notionhq/client"
+// 부수효과 목적의 import: 스케줄된 완료 계약 동기화 sync를 등록한다.
+import "./sync/scheduledCompletionSync.js"
 
-const worker = new Worker()
 export default worker
-
-/** 완료 계약서 zip(contract.pdf + certificate.pdf)을 받아 Notion 파일 속성에 첨부한다. */
-async function attachSignedDocument(notion: Client, pageId: string, receiverMetaId: string) {
-  const buffer = await widsign.downloadDocRaw(receiverMetaId)
-  const zip = await JSZip.loadAsync(buffer)
-
-  async function uploadEntry(entryName: string, filename: string): Promise<string | null> {
-    const entry = zip.file(entryName)
-    if (!entry) return null
-    const data = await entry.async("arraybuffer")
-    const upload = await notion.fileUploads.create({ filename, content_type: "application/pdf" })
-    await notion.fileUploads.send({
-      file_upload_id: upload.id,
-      file: { filename, data: new Blob([data], { type: "application/pdf" }) },
-    })
-    return upload.id
-  }
-
-  const contractUploadId = await uploadEntry("contract.pdf", "완료_계약서.pdf")
-  const certificateUploadId = await uploadEntry("certificate.pdf", "감사추적인증서.pdf")
-
-  const properties: Record<string, { type: "file_upload"; file_upload: { id: string } }[]> = {}
-  if (contractUploadId) {
-    properties["완료 계약서"] = [{ type: "file_upload", file_upload: { id: contractUploadId } }]
-  }
-  if (certificateUploadId) {
-    properties["감사추적인증서"] = [{ type: "file_upload", file_upload: { id: certificateUploadId } }]
-  }
-  if (Object.keys(properties).length > 0) {
-    // biome-ignore lint: Notion 공식 SDK 타입과 정확히 맞추기보다 최소한으로 캐스팅한다.
-    await notion.pages.update({ page_id: pageId, properties: properties as any })
-  }
-
-  return {
-    attachedContract: Boolean(contractUploadId),
-    attachedCertificate: Boolean(certificateUploadId),
-  }
-}
 
 // Example agent tool that returns a greeting
 // Delete this when you're ready to start building your own tools.
@@ -282,16 +251,25 @@ worker.webhook("widsignSendOnStatusChange", {
       if (getStatus(props, "진행상태") !== "발송") continue
       if (getNumber(props, "발송 ID (send_id)") !== undefined) continue // 이미 발송됨
 
-      const formId = getText(props, "양식 ID (form_id)")
+      let formId = getText(props, "양식 ID (form_id)")
+      if (!formId) {
+        const contractType = getSelect(props, "계약종류")
+        if (contractType) formId = CONTRACT_TYPE_FORM_ID_MAP[contractType]
+      }
       const receiverEmail = getEmail(props, "수신자 이메일")
       const title = getTitle(props, "계약명")
 
       if (!formId || !receiverEmail || !title) {
+        const contractType = getSelect(props, "계약종류")
+        const formIdHint =
+          contractType && !CONTRACT_TYPE_FORM_ID_MAP[contractType]
+            ? ` ("계약종류"에 "${contractType}"를 선택했지만 매핑된 템플릿이 없습니다 — 지원 종류: ${Object.keys(CONTRACT_TYPE_FORM_ID_MAP).join(", ")})`
+            : ""
         await notion.pages.update({
           page_id: pageId,
           properties: {
             "API 메모": richText(
-              "자동 발송 실패: 양식 ID(form_id) / 수신자 이메일 / 계약명 중 비어 있는 값이 있습니다.",
+              `자동 발송 실패: 양식 ID(form_id) 또는 계약 종류 / 수신자 이메일 / 계약명 중 비어 있는 값이 있습니다.${formIdHint}`,
             ),
           },
         })
@@ -346,6 +324,7 @@ worker.webhook("widsignSendOnStatusChange", {
         await notion.pages.update({
           page_id: pageId,
           properties: {
+            "양식 ID (form_id)": richText(formId),
             "발송 ID (send_id)": { number: result.send_id },
             "수신자 ID": richText(first?.receiver_meta_id ?? ""),
             "서명 URL": { url: first?.send_url ?? null },
@@ -401,33 +380,7 @@ worker.webhook("widsignSyncCompletedDocument", {
       if (status !== "END") continue // 아직 서명 완료 전 — 다음 주기에 재시도
 
       try {
-        const { attachedContract, attachedCertificate } = await attachSignedDocument(
-          notion,
-          pageId,
-          receiverMetaId,
-        )
-
-        const detail = (await widsign.getDocDetail(receiverMetaId)) as unknown as DocDetailResult
-        const receiverValues = extractReceiverValues(formId, detail)
-        const receiverProperties: Record<string, unknown> = {}
-        for (const [key, value] of Object.entries(receiverValues)) {
-          receiverProperties[key] = richText(value)
-        }
-
-        await notion.pages.update({
-          page_id: pageId,
-          properties: {
-            ...receiverProperties,
-            "진행상태": { status: { name: "완료" } },
-            "API 상태 코드": { select: { name: "END" } },
-            "완료일시": { date: { start: new Date().toISOString() } },
-            "최근 동기화": { date: { start: new Date().toISOString() } },
-            "API 메모": richText(
-              `자동 동기화 완료 (계약서: ${attachedContract ? "첨부됨" : "없음"}, ` +
-                `인증서: ${attachedCertificate ? "첨부됨" : "없음"})`,
-            ),
-          },
-        })
+        await syncCompletedContract(notion, pageId, formId, receiverMetaId)
       } catch (error) {
         await notion.pages.update({
           page_id: pageId,
