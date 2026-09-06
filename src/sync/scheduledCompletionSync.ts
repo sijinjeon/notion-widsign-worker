@@ -25,7 +25,7 @@ import * as Schema from "@notionhq/workers/schema"
 import * as widsign from "../widsign/api.js"
 import { syncCompletedContract } from "../widsign/completion.js"
 import { getText, getTitle, getNumber, hasFiles } from "../notion/properties.js"
-import { notifySlack } from "../notify/slack.js"
+import { notifyEvent } from "../notify/slack.js"
 import type { Client } from "@notionhq/client"
 
 // ---- 환경변수로 조절 가능한 설정 (기본값은 docs/DATABASE_SCHEMA.md의 속성명과 일치) ----
@@ -176,7 +176,12 @@ worker.sync("widsignScheduledCompletionSync", {
         `이번 실행에서 수정 예정 건수(${toUpdate.length})가 한도(WIDSIGN_MAX_UPDATES_PER_RUN=${MAX_UPDATES_PER_RUN})를 ` +
         "초과해 아무 것도 수정하지 않았습니다. 예상치 못하게 많은 계약이 한꺼번에 완료 처리 대상이 됐다면 원인을 먼저 확인하세요."
       console.error(`[widsignScheduledCompletionSync] ${reason}`)
-      await notifySlack(`⚠️ *완료 동기화 중단*: ${reason}`)
+      await notifyEvent({
+        emoji: "⚠️",
+        headline: "완료 동기화 중단",
+        source: "8시/15시 자동 완료 확인 (widsignScheduledCompletionSync)",
+        detail: reason,
+      })
     } else if (DRY_RUN) {
       console.log(
         `[widsignScheduledCompletionSync] DRY RUN — 실제로는 수정하지 않습니다. ` +
@@ -192,13 +197,26 @@ worker.sync("widsignScheduledCompletionSync", {
             },
           })
           summary.actualUpdates++
-          await notifySlack(`🎉 *계약 완료*: ${candidate.title}`)
+          await notifyEvent({
+            emoji: "🎉",
+            headline: "계약 완료",
+            source: "8시/15시 자동 완료 확인 (widsignScheduledCompletionSync)",
+            contractTitle: candidate.title,
+            pageId: candidate.pageId,
+          })
         } catch (error) {
           summary.errors++
           console.error(
             `[widsignScheduledCompletionSync] 완료 처리 실패 (page ${candidate.pageId}): ${(error as Error).message}`,
           )
-          await notifySlack(`⚠️ *완료 처리 실패* (${candidate.title}): ${(error as Error).message}`)
+          await notifyEvent({
+            emoji: "⚠️",
+            headline: "완료 처리 실패",
+            source: "8시/15시 자동 완료 확인 (widsignScheduledCompletionSync)",
+            contractTitle: candidate.title,
+            pageId: candidate.pageId,
+            detail: (error as Error).message,
+          })
         }
       }
     }

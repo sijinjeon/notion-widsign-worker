@@ -23,7 +23,7 @@ import {
   hasFiles,
   richText,
 } from "./notion/properties.js"
-import { notifySlack } from "./notify/slack.js"
+import { notifyEvent } from "./notify/slack.js"
 // 부수효과 목적의 import: 스케줄된 완료 계약 동기화 sync를 등록한다.
 import "./sync/scheduledCompletionSync.js"
 
@@ -271,7 +271,14 @@ worker.webhook("widsignSendOnStatusChange", {
           page_id: pageId,
           properties: { "API 메모": richText(`자동 발송 실패: ${reason}`) },
         })
-        await notifySlack(`⚠️ *발송 실패* (${title ?? pageId}): ${reason}`)
+        await notifyEvent({
+          emoji: "⚠️",
+          headline: "발송 실패",
+          source: "계약 발송 자동화 (widsignSendOnStatusChange)",
+          contractTitle: title,
+          pageId,
+          detail: reason,
+        })
         continue
       }
 
@@ -303,7 +310,14 @@ worker.webhook("widsignSendOnStatusChange", {
           page_id: pageId,
           properties: { "API 메모": richText(`자동 발송 실패: ${(error as Error).message}`) },
         })
-        await notifySlack(`⚠️ *발송 실패* (${title}): ${(error as Error).message}`)
+        await notifyEvent({
+          emoji: "⚠️",
+          headline: "발송 실패",
+          source: "계약 발송 자동화 (widsignSendOnStatusChange)",
+          contractTitle: title,
+          pageId,
+          detail: (error as Error).message,
+        })
         continue
       }
 
@@ -335,13 +349,27 @@ worker.webhook("widsignSendOnStatusChange", {
             "API 메모": richText("자동 발송 완료"),
           },
         })
-        await notifySlack(`✅ *계약 발송*: ${title} → ${receiverEmail}`)
+        await notifyEvent({
+          emoji: "✅",
+          headline: "계약 발송",
+          source: "계약 발송 자동화 (widsignSendOnStatusChange)",
+          contractTitle: title,
+          pageId,
+          detail: `수신자: ${receiverEmail}`,
+        })
       } catch (error) {
         await notion.pages.update({
           page_id: pageId,
           properties: { "API 메모": richText(`자동 발송 실패: ${(error as Error).message}`) },
         })
-        await notifySlack(`⚠️ *발송 실패* (${title}): ${(error as Error).message}`)
+        await notifyEvent({
+          emoji: "⚠️",
+          headline: "발송 실패",
+          source: "계약 발송 자동화 (widsignSendOnStatusChange)",
+          contractTitle: title,
+          pageId,
+          detail: (error as Error).message,
+        })
       }
     }
   },
@@ -384,13 +412,26 @@ worker.webhook("widsignSyncCompletedDocument", {
 
       try {
         await syncCompletedContract(notion, pageId, formId, receiverMetaId)
-        await notifySlack(`🎉 *계약 완료*: ${title ?? pageId}`)
+        await notifyEvent({
+          emoji: "🎉",
+          headline: "계약 완료",
+          source: "완료 동기화 웹훅 (widsignSyncCompletedDocument)",
+          contractTitle: title,
+          pageId,
+        })
       } catch (error) {
         await notion.pages.update({
           page_id: pageId,
           properties: { "API 메모": richText(`자동 동기화 실패: ${(error as Error).message}`) },
         })
-        await notifySlack(`⚠️ *완료 처리 실패* (${title ?? pageId}): ${(error as Error).message}`)
+        await notifyEvent({
+          emoji: "⚠️",
+          headline: "완료 처리 실패",
+          source: "완료 동기화 웹훅 (widsignSyncCompletedDocument)",
+          contractTitle: title,
+          pageId,
+          detail: (error as Error).message,
+        })
       }
     }
   },
