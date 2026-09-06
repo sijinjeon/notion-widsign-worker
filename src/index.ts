@@ -23,6 +23,7 @@ import {
   hasFiles,
   richText,
 } from "./notion/properties.js"
+import { notifySlack } from "./notify/slack.js"
 // 부수효과 목적의 import: 스케줄된 완료 계약 동기화 sync를 등록한다.
 import "./sync/scheduledCompletionSync.js"
 
@@ -265,14 +266,12 @@ worker.webhook("widsignSendOnStatusChange", {
           contractType && !CONTRACT_TYPE_FORM_ID_MAP[contractType]
             ? ` ("계약종류"에 "${contractType}"를 선택했지만 매핑된 템플릿이 없습니다 — 지원 종류: ${Object.keys(CONTRACT_TYPE_FORM_ID_MAP).join(", ")})`
             : ""
+        const reason = `양식 ID(form_id) 또는 계약 종류 / 수신자 이메일 / 계약명 중 비어 있는 값이 있습니다.${formIdHint}`
         await notion.pages.update({
           page_id: pageId,
-          properties: {
-            "API 메모": richText(
-              `자동 발송 실패: 양식 ID(form_id) 또는 계약 종류 / 수신자 이메일 / 계약명 중 비어 있는 값이 있습니다.${formIdHint}`,
-            ),
-          },
+          properties: { "API 메모": richText(`자동 발송 실패: ${reason}`) },
         })
+        await notifySlack(`⚠️ *발송 실패* (${title ?? pageId}): ${reason}`)
         continue
       }
 
@@ -304,6 +303,7 @@ worker.webhook("widsignSendOnStatusChange", {
           page_id: pageId,
           properties: { "API 메모": richText(`자동 발송 실패: ${(error as Error).message}`) },
         })
+        await notifySlack(`⚠️ *발송 실패* (${title}): ${(error as Error).message}`)
         continue
       }
 
@@ -335,11 +335,13 @@ worker.webhook("widsignSendOnStatusChange", {
             "API 메모": richText("자동 발송 완료"),
           },
         })
+        await notifySlack(`✅ *계약 발송*: ${title} → ${receiverEmail}`)
       } catch (error) {
         await notion.pages.update({
           page_id: pageId,
           properties: { "API 메모": richText(`자동 발송 실패: ${(error as Error).message}`) },
         })
+        await notifySlack(`⚠️ *발송 실패* (${title}): ${(error as Error).message}`)
       }
     }
   },
@@ -372,6 +374,7 @@ worker.webhook("widsignSyncCompletedDocument", {
       const formId = getText(props, "양식 ID (form_id)")
       const receiverMetaId = getText(props, "수신자 ID")
       const sendId = getNumber(props, "발송 ID (send_id)")
+      const title = getTitle(props, "계약명")
       if (!formId || !receiverMetaId || sendId === undefined) continue
 
       // 위드싸인에서 실제 최신 상태를 재확인한다 (Notion 쪽 값은 오래됐을 수 있음).
@@ -381,11 +384,13 @@ worker.webhook("widsignSyncCompletedDocument", {
 
       try {
         await syncCompletedContract(notion, pageId, formId, receiverMetaId)
+        await notifySlack(`🎉 *계약 완료*: ${title ?? pageId}`)
       } catch (error) {
         await notion.pages.update({
           page_id: pageId,
           properties: { "API 메모": richText(`자동 동기화 실패: ${(error as Error).message}`) },
         })
+        await notifySlack(`⚠️ *완료 처리 실패* (${title ?? pageId}): ${(error as Error).message}`)
       }
     }
   },
