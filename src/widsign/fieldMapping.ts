@@ -235,8 +235,6 @@ export const FORM_ITEM_MAP: Record<string, FormFieldMapping> = {
  */
 export const CONTRACT_TYPE_FORM_ID_MAP: Record<string, string> = {
   전시참여작가: "6a968f8c018f754b016eb79d", // v3 — 계약서양식 01_전시 참여 작가_v3
-  입주청소: "6a585eb0365aa6b2d355f7dd",
-  패키지디자인: "6a84000ed994df5b4d04aeeb",
 }
 
 /**
